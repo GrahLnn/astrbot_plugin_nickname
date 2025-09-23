@@ -193,7 +193,7 @@ class NicknamePlugin(Star):
     # 仅群聊触发，避免私聊误报；优先级低于命令，确保不抢
     @filter.event_message_type(filter.EventMessageType.GROUP_MESSAGE)
     async def on_group_message(self, event: AstrMessageEvent):
-        msg = event.message_str or ""
+        msg = event.message_str.lower() or ""
         if msg.startswith("/"):
             return
 
