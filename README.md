@@ -1,9 +1,3 @@
-# helloworld
+# nick friend
 
-AstrBot 插件模板
-
-A template plugin for AstrBot plugin feature
-
-# 支持
-
-[帮助文档](https://astrbot.app)
+给你的好兄弟取外号，并通过外号自动 at 他

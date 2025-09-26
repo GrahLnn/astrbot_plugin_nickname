@@ -9,6 +9,24 @@ from astrbot.api.event import filter, AstrMessageEvent
 from astrbot.api.star import Context, Star, register, StarTools
 from astrbot.api import logger
 import astrbot.api.message_components as Comp
+import re
+
+
+_AT_CQ = re.compile(r"\[CQ:at,[^\]]+\]")
+
+
+def _strip_at(event) -> str:
+    # 首选：基于组件拿纯文字
+    parts = []
+    for seg in event.get_messages():  # ← 核心修复
+        if isinstance(seg, Comp.Plain):
+            parts.append(seg.text)
+    if parts:
+        return "".join(parts).strip()
+
+    # 兜底：部分平台只给字符串
+    raw = event.message_str or ""  # 文档明确提供 message_str 属性/同名方法
+    return _AT_CQ.sub("", raw).strip()
 
 
 def _norm_str(s: str) -> str:
@@ -193,7 +211,8 @@ class NicknamePlugin(Star):
     # 仅群聊触发，避免私聊误报；优先级低于命令，确保不抢
     @filter.event_message_type(filter.EventMessageType.GROUP_MESSAGE)
     async def on_group_message(self, event: AstrMessageEvent):
-        msg = event.message_str.lower() or ""
+        raw = _strip_at(event)
+        msg = raw.lower()
         if msg.startswith("/"):
             return
 
@@ -201,6 +220,27 @@ class NicknamePlugin(Star):
         gid = event.get_group_id() or ""
         if not gid:
             return
+
+        triggers = ["都来康", "都来看"]
+
+        # --- 新增：触发全体命中 ---
+        if any(trigger in msg for trigger in triggers):
+            chain = []
+            for rec in self._members:
+                if rec.get("group_id") != gid:
+                    continue
+                sid = rec.get("sid")
+                if not sid:
+                    continue
+                chain.append(Comp.At(qq=sid))
+                chain.append(Comp.Plain("\u00a0"))
+            logger.debug(chain)
+            if chain:
+                # 最后补上消息正文
+                chain[-1] = Comp.Plain("\u200b\n" + msg)
+                yield event.chain_result(chain)
+            return
+        # --- 全体命中结束 ---
 
         # 收集命中：sid -> 最早出现位置
         first_pos = {}  # sid -> idx
